@@ -187,15 +187,18 @@ PostGomSQL/
 - **Ottimizzazioni**: Nessuna (IR grezzo)
 
 #### Strategia di Compilazione
-Il compilatore genera LLVM IR **esclusivamente per la clausola WHERE**:
+Il compilatore genera LLVM IR **parametrico per la clausola WHERE**:
 
 ```llvm
-define i1 @evaluate_row(i32 %row_index) {
+define i1 @evaluate_row(i32 %".1", double %".2") {
 entry:
   ; Codice generato per condizione WHERE
-  ; es: eta > 18
-  %1 = icmp sgt i32 35, 18
-  ret i1 %1
+  ; Parametri: %".1" = eta, %".2" = prezzo
+  ; es: eta > 18 E prezzo > 20.0
+  %".3" = icmp sgt i32 %".1", 18
+  %".4" = fcmp ogt double %".2", 20.0
+  %".5" = and i1 %".3", %".4"
+  ret i1 %".5"
 }
 ```
 
@@ -220,12 +223,14 @@ Query: `arò eta > 18 E zona = "Scampia"`
 ; ModuleID = "gomorrasql_query"
 target triple = "arm64-apple-darwin25.1.0"
 
-define i1 @evaluate_row(i32 %".1") {
+define i1 @evaluate_row(i32 %".1", i32 %".2") {
 entry:
-  ; eta > 18
-  %".3" = icmp sgt i32 35, 18
+  ; Parametri: %".1" = eta, %".2" = zona
   
-  ; zona = "Scampia" (placeholder)
+  ; eta > 18
+  %".3" = icmp sgt i32 %".1", 18
+  
+  ; zona = "Scampia" (placeholder: ritorna true)
   %".4" = icmp eq i32 1, 1
   
   ; AND bitwise
@@ -236,9 +241,11 @@ entry:
 ```
 
 **Caratteristiche IR:**
+- **Parametri tipizzati**: `i32` per int, `double` per float
 - **Un solo basic block** (`entry`)
 - **Nessun branching** (AND/OR come operatori bitwise `and i1`, `or i1`)
 - **IRBuilder sequenziale** (costruisce istruzioni linearmente)
+- **Esecuzione JIT**: Funzione chiamata riga-per-riga con valori reali
 
 #### Limitazioni Note
 
