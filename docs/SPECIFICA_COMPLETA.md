@@ -241,9 +241,51 @@ entry:
 - **IRBuilder sequenziale** (costruisce istruzioni linearmente)
 
 #### Limitazioni Note
-1. **No JIT su ARM64**: LLVM JIT non supportato nativamente su Apple Silicon
-2. **Fallback Python**: IR generato correttamente ma eseguito in Python per portabilità
-3. **Placeholder stringhe**: Confronti stringhe ritornano sempre `true`
+
+##### 1. Crash MCJIT su ARM64 (Exit Code 139 - SIGSEGV)
+
+**Stato dell'implementazione:**
+- ✅ **IR parametrico generato correttamente**: Le funzioni LLVM accettano parametri di tipo `i32`, `double` per ogni colonna della WHERE
+- ✅ **Compilazione JIT funzionante**: Il modulo LLVM viene compilato con successo tramite MCJIT e restituisce un puntatore a funzione nativa
+- ❌ **Esecuzione su ARM64 fallisce**: Quando la funzione JIT viene invocata, il processo termina con SIGSEGV (Segmentation Fault)
+
+**Causa tecnica del crash:**
+
+Il crash è causato dall'**incompatibilità del backend Legacy MCJIT** (incluso in llvmlite) con il modello di memoria ARM64. Nello specifico, il runtime non gestisce correttamente:
+
+1. **Violazione W^X (Write XOR Execute)**
+   - **Problema**: Su ARM64 (Apple Silicon), una pagina di memoria non può essere contemporaneamente **Scrivibile (W)** ed **Eseguibile (X)**.
+   - **Comportamento MCJIT**: Alloca memoria tramite `mmap()` con permessi `PROT_WRITE | PROT_EXEC`, che su macOS ARM64 viene **silenziosamente ridotto** a solo `PROT_WRITE`.
+   - **Risultato**: Quando il codice JIT tenta di eseguire la funzione, il processore solleva **SIGSEGV** perché la memoria non è marcata come eseguibile.
+   - **Soluzione richiesta (non implementata in llvmlite)**: Chiamare `pthread_jit_write_protect_np(0)` prima di scrivere il codice, poi `pthread_jit_write_protect_np(1)` per rendere la pagina eseguibile (disponibile solo su macOS).
+
+2. **Incoerenza I-Cache/D-Cache**
+   - **Problema**: ARM64 ha due cache separate:
+     * **D-Cache (Dati)**: Dove MCJIT scrive il codice macchina
+     * **I-Cache (Istruzioni)**: Dove la CPU cerca le istruzioni da eseguire
+   - **Comportamento MCJIT**: Non emette l'istruzione `IC IVAU` (Instruction Cache Invalidate by VA to PoU) necessaria per invalidare la I-Cache dopo aver scritto codice nella D-Cache.
+   - **Risultato**: La CPU esegue istruzioni **obsolete o casuali** dalla I-Cache, causando comportamento indefinito e SIGSEGV.
+   - **Soluzione richiesta (non implementata in llvmlite)**: Emettere `__builtin___clear_cache(start, end)` o istruzione assembly `IC IVAU` dopo ogni scrittura di codice.
+
+**Versioni testate:**
+- `llvmlite 0.40.0` ❌ (crash)
+- `llvmlite 0.43.0` ❌ (crash)
+- `llvmlite 0.46.0` ❌ (crash)
+
+**Alternativa non disponibile:**
+- LLVM Interpreter (`lli`): Non esposto da llvmlite, solo MCJIT disponibile
+- ORC JIT v2: Non disponibile in llvmlite (richiede binding Python personalizzati)
+
+**Stato corrente:**
+- **JIT disabilitato di default** su ARM64 per evitare crash
+- **Flag sperimentale**: `GOMORRASQL_ENABLE_JIT=1` per testare (terminerà con exit code 139)
+- **Fallback Python**: Utilizzato automaticamente, garantisce risultati corretti
+
+##### 2. Fallback Python
+IR generato correttamente ma eseguito in Python per massima portabilità e stabilità.
+
+##### 3. Placeholder stringhe
+Confronti stringhe ritornano sempre `true` (non implementati in LLVM IR).
 
 ---
 

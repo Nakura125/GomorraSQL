@@ -36,6 +36,15 @@ uv run python main.py "RIPIGLIAMMO nome MMIEZ 'A \"guaglioni.csv\" arò nome nun
 uv run python main.py "RIPIGLIAMMO nome, token MMIEZ 'A \"guaglioni.csv\" pesc e pesc \"lexer.csv\""
 ```
 
+### Esecuzione con JIT LLVM (Sperimentale)
+```bash
+# Abilita JIT compilation (instabile su ARM64)
+GOMORRASQL_ENABLE_JIT=1 uv run python main.py queries/08_comparison_equal.gsql
+
+# NOTA: Il JIT è disabilitato di default su ARM64 (Apple Silicon)
+# perché può causare crash. Usa solo per sperimentazione.
+```
+
 ---
 
 ## 🧪 Testing

@@ -9,18 +9,11 @@
 
 ---
 
-## Documentazione Completa
-
-Per la **specifica accademica completa** secondo i requisiti del corso, consulta:
+## Documentazione Aggiuntiva
 
 **📄 [SPECIFICA_COMPLETA.md](docs/SPECIFICA_COMPLETA.md)**
 
-Contiene:
-1. ✅ Specifiche del linguaggio (lessicale, sintattica, semantica con esempi)
-2. ✅ Linguaggio di sviluppo (Python + motivazioni)
-3. ✅ Codice target (LLVM IR via llvmlite + mapping tipi)
-4. ✅ Metodologia implementazione (Lark LALR + Visitor Pattern)
-5. ✅ Esempi significativi (6 query con IR generato)
+**📄 [REPORT_AI.md](docs/AI_USAGE_REPORT.md)**
 
 ## 🚀 Quick Start
 
@@ -28,27 +21,9 @@ Contiene:
 ```bash
 # Clona repository
 git clone <repository-url>
-cd PostGomSQL
 
 # Installa dipendenze con uv
 uv sync
-```
-
-### Esecuzione Query
-```bash
-# Esempio: SELECT con WHERE
-uv run python -c "
-from src.compiler import GomorraCompiler
-compiler = GomorraCompiler()
-query = '''
-RIPIGLIAMMO nome, eta
-MMIEZ 'A \"guaglioni.csv\"
-arò eta > 18
-'''
-results = compiler.compile_and_run(query)
-for row in results:
-    print(row)
-"
 ```
 
 ### Esecuzione Test
@@ -67,11 +42,6 @@ uv run pytest tests/test_type_inference.py -v  # 6 test type inference
 
 
 ## 📊 Test Suite
-
-**Metriche**:
-- **19 test totali** (tutti passati)
-- **89.39% coverage** (424 statements, 45 missed)
-- **3 categorie**: compiler, scalabilità, type inference
 
 ### Test Compiler (`test_compiler.py` - 11 test)
 ```python
@@ -191,7 +161,7 @@ arò guaglioni.eta > 18 E lexer.line < 100
 ## 🔗 Collegamenti Utili
 
 ### Repository e Documentazione
-- **GitHub**: [github.com/Nakura125/PostGomSQL](https://github.com/Nakura125/PostGomSQL)
+- **GitHub**: [github.com/Nakura125/PostGomSQL](https://github.com/Nakura125/GomorraSQL)
 - **Specifica Completa**: [docs/SPECIFICA_COMPLETA.md](docs/SPECIFICA_COMPLETA.md)
 - **Presentazione Beamer**: Slide LaTeX nella repository
 
@@ -209,14 +179,13 @@ arò guaglioni.eta > 18 E lexer.line < 100
 
 **Angelo Alberico**  
 Matricola: NF22500104  
-Email: a.alberico@studenti.unina.it  
 GitHub: [@Nakura125](https://github.com/Nakura125)
 
 ---
 
 ## 📄 Licenza
 
-Questo progetto è sviluppato per scopi didattici nel corso di **Implementazione di Linguaggi di Programmazione** presso l'Università degli Studi di Napoli Federico II.
+Questo progetto è sviluppato per scopi didattici nel corso di **Implementazione di Linguaggi di Programmazione** presso l'Università degli Studi di Salerno.
 
 Il progetto originale Gomorra-SQL (Java) è distribuito sotto licenza MIT da [Donato Rimenti](https://github.com/aurasphere).
 
@@ -226,18 +195,8 @@ Il progetto originale Gomorra-SQL (Java) è distribuito sotto licenza MIT da [Do
 
 ---
 
-## 📚 Documentazione Aggiuntiva
-- **PRESENTAZIONE.md**: Presentazione dettagliata del progetto (15 sezioni)
-- **specifica_lessicale.md**: Specifica tokens e automi
-- **specifica_sintattica.md**: Grammatica LL(k)
-- **specifica_semantica.md**: Regole validazione
-
----
-
 ## 👥 Autore
 Angelo Alberico - Progetto Linguaggi e Compilatori
 
 ---
 
-## 📄 Licenza
-Progetto accademico - Università degli Studi di Napoli Federico II

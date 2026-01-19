@@ -35,12 +35,7 @@ class LLVMCodeGenerator(ASTVisitor):
         self.data_dir = Path(data_dir)
         self.module = ir.Module(name="gomorrasql_query")
         self.builder = None
-        
-        # Inizializza LLVM (llvmlite >= 0.40 gestisce automaticamente l'inizializzazione)
-        # llvm.initialize()  # Deprecato
-        # llvm.initialize_native_target()  # Deprecato
-        # llvm.initialize_native_asmprinter()  # Deprecato
-        
+                
         # Dati caricati (per ora li carichiamo in Python e li passiamo a LLVM)
         self.data: List[Dict[str, Any]] = []
         self.columns: List[str] = []
@@ -57,6 +52,8 @@ class LLVMCodeGenerator(ASTVisitor):
         Returns:
             Risultati della query
         """
+        import os
+        
         print("--- GENERAZIONE CODICE LLVM ---")
         
         # Reset del modulo per ogni query per evitare duplicazioni di nomi
@@ -66,10 +63,21 @@ class LLVMCodeGenerator(ASTVisitor):
         # 1. Carica dati CSV (supporta multiple tabelle per JOIN)
         self._load_csv_data(ast.tables)
         
-        # 2. Genera funzione LLVM
+        # 2. Genera funzione LLVM parametrica
         func = self._generate_query_function(ast)
         
-        # 3. Esegui query (esecuzione Python - JIT non supportato su ARM64)
+        # 3. Compila LLVM IR con JIT (se abilitato esplicitamente)
+        # Disabilitato di default su ARM64 per evitare crash
+        enable_jit = os.environ.get('GOMORRASQL_ENABLE_JIT', '0') == '1'
+        
+        if enable_jit:
+            self.jit_func = self._compile_llvm_to_jit(func)
+        else:
+            self.jit_func = None
+            print("⚠ JIT disabilitato (ARM64)")
+            print("  → Usa GOMORRASQL_ENABLE_JIT=1 per abilitare (instabile su ARM64)")
+        
+        # 4. Esegui query usando JIT LLVM (o fallback Python)
         print("--- ESECUZIONE QUERY ---")
         results = self._execute_query(ast, engine=None)
         
@@ -213,27 +221,53 @@ class LLVMCodeGenerator(ASTVisitor):
     
     def _generate_query_function(self, ast: SelectQuery):
         """
-        Genera la funzione LLVM per valutare la query
+        Genera UNA singola funzione LLVM parametrica per valutare WHERE
         
-        Firma: i1 @evaluate_row(i32* row_data)
+        Firma: i1 @evaluate_row(i32 %col1, double %col2, ...)
+        Riceve i valori delle colonne come parametri
         Ritorna: 1 se la riga passa il filtro WHERE, 0 altrimenti
         """
         # Imposta triple nativo prima di generare il codice
         self.module.triple = llvm.get_default_triple()
         
-        # Tipo di funzione: bool evaluate_row(row_index)
-        func_type = ir.FunctionType(ir.IntType(1), [ir.IntType(32)])
-        func = ir.Function(self.module, func_type, name="evaluate_row")
-        
-        # Entry block
-        block = func.append_basic_block(name="entry")
-        self.builder = ir.IRBuilder(block)
-        
-        # Se non c'è WHERE, ritorna sempre true
+        # Determina parametri della funzione in base alle colonne usate nel WHERE
         if ast.where is None:
+            # Nessun WHERE: funzione dummy che ritorna sempre true
+            func_type = ir.FunctionType(ir.IntType(1), [])
+            func = ir.Function(self.module, func_type, name="evaluate_row")
+            block = func.append_basic_block(name="entry")
+            self.builder = ir.IRBuilder(block)
             self.builder.ret(ir.Constant(ir.IntType(1), 1))
         else:
-            # Genera codice per la condizione WHERE
+            # Estrai colonne usate nel WHERE per creare parametri
+            where_columns = self._extract_columns_from_condition(ast.where)
+            
+            # Crea parametri funzione: un parametro per ogni colonna usata
+            param_types = []
+            self.param_map = {}  # {column_name: param_index}
+            
+            for idx, col in enumerate(where_columns):
+                col_type = self.column_types.get(col, int)
+                if col_type == int:
+                    param_types.append(ir.IntType(32))
+                elif col_type == float:
+                    param_types.append(ir.DoubleType())
+                else:
+                    param_types.append(ir.IntType(32))  # String → int placeholder
+                self.param_map[col] = idx
+            
+            # Crea funzione con parametri
+            func_type = ir.FunctionType(ir.IntType(1), param_types)
+            func = ir.Function(self.module, func_type, name="evaluate_row")
+            
+            # Entry block
+            block = func.append_basic_block(name="entry")
+            self.builder = ir.IRBuilder(block)
+            
+            # Salva parametri per usarli nella generazione IR
+            self.func_params = func.args
+            
+            # Genera codice per la condizione WHERE usando visit
             result = self.visit(ast.where)
             self.builder.ret(result)
         
@@ -242,102 +276,176 @@ class LLVMCodeGenerator(ASTVisitor):
         
         return func
     
+    def _compile_llvm_to_jit(self, func):
+        """
+        Compila LLVM IR a codice nativo usando MCJIT e wrappa con ctypes
+        
+        Returns:
+            Callable Python function o None se fallisce
+        
+        Nota: Su ARM64 (Apple Silicon) MCJIT può crashare a runtime a causa di 
+        restrizioni W^X. In caso di crash, usa fallback Python (più lento ma stabile).
+        L'IR generato è comunque corretto e verificabile.
+        """
+        import platform
+        
+        try:
+            import ctypes
+            from llvmlite import binding as llvm
+            
+            # Inizializza LLVM (llvm.initialize() è deprecato, si auto-inizializza)
+            llvm.initialize_native_target()
+            llvm.initialize_native_asmprinter()
+            
+            # Compila modulo
+            mod = llvm.parse_assembly(str(self.module))
+            mod.verify()
+            
+            # Crea target machine e MCJIT compiler
+            target = llvm.Target.from_default_triple()
+            target_machine = target.create_target_machine()
+            ee = llvm.create_mcjit_compiler(mod, target_machine)
+            ee.finalize_object()
+            
+            # Ottieni puntatore a funzione
+            func_ptr = ee.get_function_address("evaluate_row")
+            
+            if func_ptr == 0:
+                raise RuntimeError("Function pointer is NULL")
+            
+            # Determina signature ctypes in base ai parametri
+            param_types = []
+            for arg in func.args:
+                arg_type = arg.type
+                if isinstance(arg_type, ir.IntType):
+                    param_types.append(ctypes.c_int32)
+                elif isinstance(arg_type, ir.DoubleType):
+                    param_types.append(ctypes.c_double)
+                else:
+                    param_types.append(ctypes.c_int32)
+            
+            # Crea callable Python
+            cfunc = ctypes.CFUNCTYPE(ctypes.c_bool, *param_types)(func_ptr)
+            
+            print(f"✓ LLVM IR compilato con MCJIT")
+            if platform.machine() == 'arm64':
+                print("  ⚠ MCJIT su ARM64 può crashare - se succede, disabilita JIT")
+            
+            return cfunc
+            
+        except Exception as e:
+            print(f"⚠ Compilazione LLVM fallita: {e}")
+            print("  → Fallback a esecuzione Python")
+            return None
+    
     def visit_select_query(self, node: SelectQuery):
-        """Non serve per la generazione del filtro"""
+        """Metodo richiesto da ASTVisitor (non usato per generazione IR)"""
         pass
     
     def visit_comparison(self, node: Comparison):
         """
-        Genera codice per una comparazione con type inference CSV→IR
-        Supporta: int (i32), float (double), string (i8*), NULL
-        """
-        # ✅ Implementazione completa type inference CSV→IR
-        # Determina il tipo della colonna sinistra
-        col_type = self.column_types.get(node.left, int)  # Default int
+        Genera IR per comparazione usando PARAMETRI della funzione
         
-        # Genera valore sinistro (sempre placeholder per demo IR)
+        Es: eta > 18 diventa:
+        define i1 @evaluate_row(i32 %eta) {
+          %1 = icmp sgt i32 %eta, 18
+          ret i1 %1
+        }
+        """
+        col_type = self.column_types.get(node.left, int)
+        
+        # Ottieni il parametro della funzione per questa colonna
+        param_idx = self.param_map.get(node.left, 0)
+        left_val = self.func_params[param_idx]
+        
         if col_type == int:
-            # Intero: i32
-            left_val = ir.Constant(ir.IntType(32), 35)
-            # Valore destro: converti a intero
+            # Valore destro
             if isinstance(node.right, (int, float)):
                 right_val = ir.Constant(ir.IntType(32), int(node.right))
             else:
                 right_val = ir.Constant(ir.IntType(32), 0)
             
-            # Comparazione signed integer
+            # Genera comparazione con PARAMETRO
             if node.operator == '>':
-                result = self.builder.icmp_signed('>', left_val, right_val)
+                return self.builder.icmp_signed('>', left_val, right_val)
             elif node.operator == '<':
-                result = self.builder.icmp_signed('<', left_val, right_val)
+                return self.builder.icmp_signed('<', left_val, right_val)
             elif node.operator == '>=':
-                result = self.builder.icmp_signed('>=', left_val, right_val)
+                return self.builder.icmp_signed('>=', left_val, right_val)
             elif node.operator == '<=':
-                result = self.builder.icmp_signed('<=', left_val, right_val)
+                return self.builder.icmp_signed('<=', left_val, right_val)
             elif node.operator == '=':
-                result = self.builder.icmp_signed('==', left_val, right_val)
+                return self.builder.icmp_signed('==', left_val, right_val)
             elif node.operator in ['<>', '!=']:
-                result = self.builder.icmp_signed('!=', left_val, right_val)
-            else:
-                result = ir.Constant(ir.IntType(1), 1)
+                return self.builder.icmp_signed('!=', left_val, right_val)
         
         elif col_type == float:
-            # Float: double (64-bit floating point)
-            left_val = ir.Constant(ir.DoubleType(), 35.0)
-            # Valore destro: converti a float
+            # Valore destro
             if isinstance(node.right, (int, float)):
                 right_val = ir.Constant(ir.DoubleType(), float(node.right))
             else:
                 right_val = ir.Constant(ir.DoubleType(), 0.0)
             
-            # Comparazione floating point (ordered)
+            # Genera comparazione con PARAMETRO
             if node.operator == '>':
-                result = self.builder.fcmp_ordered('>', left_val, right_val)
+                return self.builder.fcmp_ordered('>', left_val, right_val)
             elif node.operator == '<':
-                result = self.builder.fcmp_ordered('<', left_val, right_val)
+                return self.builder.fcmp_ordered('<', left_val, right_val)
             elif node.operator == '>=':
-                result = self.builder.fcmp_ordered('>=', left_val, right_val)
+                return self.builder.fcmp_ordered('>=', left_val, right_val)
             elif node.operator == '<=':
-                result = self.builder.fcmp_ordered('<=', left_val, right_val)
+                return self.builder.fcmp_ordered('<=', left_val, right_val)
             elif node.operator == '=':
-                result = self.builder.fcmp_ordered('==', left_val, right_val)
+                return self.builder.fcmp_ordered('==', left_val, right_val)
             elif node.operator in ['<>', '!=']:
-                result = self.builder.fcmp_ordered('!=', left_val, right_val)
-            else:
-                result = ir.Constant(ir.IntType(1), 1)
+                return self.builder.fcmp_ordered('!=', left_val, right_val)
         
-        elif col_type == str:
-            # String: i8* (char pointer)
-            # Per demo, generiamo sempre un confronto che ritorna true
-            # In una implementazione completa, useremmo strcmp o simili
-            result = ir.Constant(ir.IntType(1), 1)
-            # Nota: Il confronto stringhe reale richiederebbe:
-            # 1. Allocare memoria per le stringhe
-            # 2. Caricare i caratteri
-            # 3. Chiamare funzione strcmp esterna o implementarla
+        # Fallback
+        return ir.Constant(ir.IntType(1), 1)
+    
+    def _extract_columns_from_condition(self, condition) -> List[str]:
+        """Estrae lista colonne usate in una condizione WHERE preservando l'ordine"""
+        columns = []
+        if isinstance(condition, Comparison):
+            columns.append(condition.left)
+            # Se right è una colonna (non un valore)
+            if isinstance(condition.right, str) and condition.right in self.columns:
+                columns.append(condition.right)
+        elif isinstance(condition, NullCheck):
+            columns.append(condition.column)
+        elif isinstance(condition, LogicOp):
+            for cond in condition.conditions:
+                columns.extend(self._extract_columns_from_condition(cond))
         
-        else:  # NULL o tipo sconosciuto
-            result = ir.Constant(ir.IntType(1), 0)
-        
-        return result
+        # Rimuovi duplicati PRESERVANDO L'ORDINE (dict mantiene insertion order da Python 3.7+)
+        return list(dict.fromkeys(columns))
     
     def visit_null_check(self, node: NullCheck):
-        """Genera codice per controllo NULL"""
-        # Per semplicità, ritorniamo sempre false (nessun valore è NULL)
-        return ir.Constant(ir.IntType(1), 0 if node.is_null else 1)
+        """Genera IR per NULL check usando parametri"""
+        # Per NULL check, confrontiamo il parametro con 0 (convenzione: NULL = 0)
+        param_idx = self.param_map.get(node.column, 0)
+        param = self.func_params[param_idx]
+        
+        # Controlla se parametro è 0 (NULL)
+        zero = ir.Constant(param.type, 0)
+        is_null = self.builder.icmp_signed('==', param, zero)
+        
+        if node.is_null:
+            return is_null
+        else:
+            # NOT NULL: inverti il risultato
+            return self.builder.xor(is_null, ir.Constant(ir.IntType(1), 1))
     
     def visit_logic_op(self, node: LogicOp):
-        """Genera codice per operatori logici AND/OR"""
+        """Genera IR per operatori logici usando parametri"""
         results = [self.visit(cond) for cond in node.conditions]
         
         if node.operator == 'AND':
-            # AND: moltiplica tutti i risultati (tutti devono essere 1)
             result = results[0]
             for r in results[1:]:
                 result = self.builder.and_(result, r)
             return result
         elif node.operator == 'OR':
-            # OR: somma tutti i risultati (almeno uno deve essere 1)
             result = results[0]
             for r in results[1:]:
                 result = self.builder.or_(result, r)
@@ -347,21 +455,23 @@ class LLVMCodeGenerator(ASTVisitor):
     
     def _execute_query(self, ast: SelectQuery, engine) -> List[Dict[str, Any]]:
         """
-        Esegue la query usando il codice JIT compilato
+        Esegue la query usando il codice JIT compilato (se disponibile)
         
-        Nota: In questa implementazione semplificata, usiamo Python
-        per iterare sui dati e chiamiamo la funzione LLVM per ogni riga.
-        In un'implementazione completa, tutto sarebbe in LLVM.
+        Se JIT non disponibile (ARM64), usa fallback Python
         """
-        # Per ora, eseguiamo il filtro in Python
-        # (l'integrazione completa Python<->LLVM richiederebbe ctypes/cffi)
-        
         results = []
         
         # Applica filtro WHERE
         for row in self.data:
             if ast.where:
-                if self._evaluate_condition_python(ast.where, row):
+                # Usa JIT se disponibile, altrimenti fallback Python
+                if self.jit_func is not None:
+                    print("Usando JIT LLVM per valutare WHERE")
+                    passes = self._evaluate_condition_jit(ast.where, row)
+                else:
+                    passes = self._evaluate_condition_python(ast.where, row)
+                
+                if passes:
                     results.append(row)
             else:
                 results.append(row)
@@ -371,6 +481,36 @@ class LLVMCodeGenerator(ASTVisitor):
             results = [{col: row[col] for col in ast.columns} for row in results]
         
         return results
+    
+    def _evaluate_condition_jit(self, condition, row: Dict[str, Any]) -> bool:
+        """
+        Valuta la condizione usando la funzione JIT compilata
+        
+        Estrae i valori delle colonne dalla riga e li passa come parametri
+        """
+        # Estrai valori delle colonne usate nella condizione
+        where_columns = self._extract_columns_from_condition(condition)
+        
+        # Prepara parametri per la chiamata JIT
+        params = []
+        for col in where_columns:
+            val = row.get(col)
+            col_type = self.column_types.get(col, int)
+            
+            # Converti al tipo appropriato
+            if col_type == int:
+                params.append(int(val) if val not in (None, '') else 0)
+            elif col_type == float:
+                params.append(float(val) if val not in (None, '') else 0.0)
+            else:
+                params.append(0)  # String → fallback
+        
+        # Chiama funzione JIT con parametri
+        try:
+            return bool(self.jit_func(*params))
+        except Exception as e:
+            print(f"⚠ Errore JIT call: {e}, fallback Python")
+            return self._evaluate_condition_python(condition, row)
     
     def _evaluate_condition_python(self, condition, row: Dict[str, Any]) -> bool:
         """
