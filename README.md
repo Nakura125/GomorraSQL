@@ -161,7 +161,7 @@ arò guaglioni.eta > 18 E lexer.line < 100
 ## 🔗 Collegamenti Utili
 
 ### Repository e Documentazione
-- **GitHub**: [github.com/Nakura125/PostGomSQL](https://github.com/Nakura125/GomorraSQL)
+- **GitHub**: [github.com/Nakura125/GomorraSQL](https://github.com/Nakura125/GomorraSQL)
 - **Specifica Completa**: [docs/SPECIFICA_COMPLETA.md](docs/SPECIFICA_COMPLETA.md)
 - **Presentazione Beamer**: Slide LaTeX nella repository
 
