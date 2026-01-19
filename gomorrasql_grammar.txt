@@ -1,0 +1,87 @@
+// ==========================================
+// GomorraSQL Grammar Specification
+// Target: Python Lark (Solo SELECT)
+// ==========================================
+
+start: select_stmt
+
+// ==========================================
+// 1. Sintassi SELECT (DQL)
+// ==========================================
+
+// Struttura: ripigliammo <cols> mmiez 'a <table> [pesc e pesc <table>] [arò <cond>]
+select_stmt: SELECT_KW projection from_clause [where_clause]
+
+// Proiezioni: Wildcard (*) o Lista Colonne
+projection: ALL_COLS -> select_all
+          | column_list
+
+column_list: column_ref ("," column_ref)*
+column_ref: identifier
+
+// Sorgente dati e Join
+from_clause: FROM_KW table_ref join_clause*
+
+join_clause: JOIN_KW table_ref
+
+// Clausola WHERE
+where_clause: WHERE_KW condition
+
+// ==========================================
+// 2. Logica Booleana
+// ==========================================
+
+// Gerarchia: OR ha priorità minore di AND
+?condition: logic_term (OR_KW logic_term)*
+
+?logic_term: logic_factor (AND_KW logic_factor)*
+
+?logic_factor: comparison
+             | null_check
+             | "(" condition ")"
+
+// Confronti standard
+comparison: identifier COMP_OP value
+          | identifier COMP_OP identifier
+
+// Controllo NULL (IS / IS NOT)
+null_check: identifier IS_KW NULL_KW       -> is_null
+          | identifier IS_NOT_KW NULL_KW   -> is_not_null
+
+table_ref: identifier | ESCAPED_STRING
+identifier: CNAME
+
+// ==========================================
+// 3. Analisi Lessicale (Keywords)
+// ==========================================
+
+// Verbi principali
+SELECT_KW: "ripigliammo"i
+FROM_KW:   "mmiez 'a"i
+ALL_COLS:  "tutto chillo ch'era 'o nuostro"i
+JOIN_KW:   "pesc e pesc"i
+WHERE_KW:  "arò"i
+
+// Operatori Logici
+AND_KW:    "e"i
+OR_KW:     "o"i
+NULL_KW:   "nisciun"i
+IS_KW:     "è"i
+IS_NOT_KW: "nun è"i
+
+// Operatori di Confronto
+COMP_OP: ">=" | "<=" | "<>" | "!=" | "=" | ">" | "<"
+
+// Valori e Tipi
+value: ESCAPED_STRING 
+     | SIGNED_NUMBER
+     | "true" | "false"
+
+// Import Standard Lark
+%import common.CNAME
+%import common.ESCAPED_STRING
+%import common.SIGNED_NUMBER
+%import common.WS
+
+// Ignora spazi bianchi
+%ignore WS

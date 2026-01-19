@@ -1,0 +1,17 @@
+# Query di test per JOIN
+
+# Test 1: JOIN semplice
+RIPIGLIAMMO nome, ruolo
+MMIEZ 'A "guaglioni.csv"
+pesc e pesc "ruoli.csv"
+
+# Test 2: JOIN con WHERE
+RIPIGLIAMMO nome, ruolo
+MMIEZ 'A "guaglioni.csv"
+pesc e pesc "ruoli.csv"
+arò eta > 18
+
+# Test 3: JOIN con colonne disambiguate
+RIPIGLIAMMO nome, nome_2, eta, ruolo
+MMIEZ 'A "guaglioni.csv"
+pesc e pesc "ruoli.csv"

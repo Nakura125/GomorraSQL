@@ -1,0 +1,4 @@
+RIPIGLIAMMO nome, nome_2, zona, eta, ruolo
+MMIEZ 'A "guaglioni.csv"
+pesc e pesc "ruoli.csv"
+arò nome = nome_2 e eta > 20 e ruolo = "Boss"

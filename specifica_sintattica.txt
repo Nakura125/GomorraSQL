@@ -1,0 +1,31 @@
+// Regola iniziale: Un programma è una singola query (o sequenza di query)
+start: query
+
+// Struttura della Query: SELECT ... FROM ... [WHERE ...] TERMINATOR
+query: "RIPIGLIAMM" column_list "NMIEZ" source clause? "STAMM_ACCISI"
+
+// Lista di colonne da selezionare
+column_list: "*"                   -> all_columns
+           | IDENTIFIER ("," IDENTIFIER)* -> specific_columns
+
+// Sorgente dati (nome del file CSV)
+source: STRING
+
+// Clausola condizionale (Opzionale)
+clause: "A" condition
+
+// Espressione condizionale
+condition: expr comparison expr
+
+// Operatori di confronto
+comparison: "EGAL"         // Uguale (=)
+          | "NON E COSA"   // Diverso (!=)
+          | "CHIU ASSAI"   // Maggiore (>)
+          | "CHIU POC"     // Minore (<)
+          | "EGAL O CHIU"  // Maggiore o uguale (>=)
+          | "EGAL O POC"   // Minore o uguale (<=)
+
+// Espressioni (Identificatori di colonna o valori costanti)
+expr: IDENTIFIER
+    | NUMBER
+    | STRING

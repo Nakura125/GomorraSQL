@@ -1,0 +1,809 @@
+\documentclass[aspectratio=169]{beamer}
+
+% Pacchetti necessari
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[italian]{babel}
+\usepackage{tikz}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usetikzlibrary{positioning, calc, backgrounds, shapes.geometric}
+
+% --- DEFINIZIONE COLORI (Light Mode - Stile Report) ---
+\definecolor{ReportWhite}{HTML}{FFFFFF}    % Sfondo Bianco
+\definecolor{ReportDarkBlue}{HTML}{003366} % Blu scuro
+\definecolor{ReportBlack}{HTML}{212121}    % Testo scuro
+\definecolor{ReportGold}{HTML}{D4AF37}     % Oro (accenti)
+
+% --- SETUP BEAMER ---
+\setbeamercolor{background canvas}{bg=ReportWhite}
+\setbeamercolor{normal text}{fg=ReportBlack}
+\setbeamercolor{frametitle}{fg=ReportDarkBlue, bg=ReportWhite}
+\setbeamercolor{title}{fg=ReportDarkBlue}
+\setbeamercolor{subtitle}{fg=ReportBlack}
+\setbeamercolor{itemize item}{fg=ReportDarkBlue}
+
+% Font
+\usefonttheme{structurebold}
+
+% --- METADATI ---
+\title{\textbf{GomorraSQL Compiler}}
+\subtitle{Compilatore SQL con Dialetto Napoletano $\to$ LLVM IR}
+\author{Angelo Alberico}
+\date{11 Gennaio 2026}
+\newcommand{\matricola}{Matr. NF22500104} 
+\newcommand{\corsodistudi}{Corso di ILP}
+
+% --- HEADER: NUMERO DI PAGINA IN ALTO A DESTRA ---
+\setbeamertemplate{headline}{
+  \ifnum\insertframenumber>1 % Nascondi sulla prima pagina
+    \vspace{0.2cm} % Spazio dal bordo superiore
+    \hfill % Spinge tutto a destra
+    \color{gray}\footnotesize\insertframenumber{} / \inserttotalframenumber\hspace{0.5cm} % Numero e margine destro
+    \vspace{0.1cm}
+  \fi
+}
+
+% --- FOOTER: SOLO INFO, NIENTE NUMERO PAGINA ---
+\setbeamertemplate{footline}{
+  \ifnum\insertframenumber>1
+  \leavevmode%
+  \hbox{%
+  % Box Sinistro: Autore e Matricola
+  \begin{beamercolorbox}[wd=.5\paperwidth,ht=2.5ex,dp=1.125ex,leftskip=.3cm]{author in head/foot}%
+    \color{gray}\insertauthor \ - \matricola
+  \end{beamercolorbox}%
+  % Box Destro: Corso di Studi (allineato a destra)
+  \begin{beamercolorbox}[wd=.5\paperwidth,ht=2.5ex,dp=1.125ex,rightskip=.3cm, right]{title in head/foot}%
+    \color{gray}\corsodistudi
+  \end{beamercolorbox}}%
+  \vskip0pt%
+  \fi
+}
+
+% Rimuove i simboli di navigazione standard
+\setbeamertemplate{navigation symbols}{}
+
+% --- COMANDO SLIDE ---
+\newcommand{\GomorraSlide}[4]{
+\begin{frame}{#1}
+    \begin{columns}[T]
+        % Colonna Sinistra (Contenuto)
+        \begin{column}{0.75\textwidth}
+            #4
+        \end{column}
+        
+        % Colonna Destra (Spazio vuoto)
+        \begin{column}{0.25\textwidth}
+        \end{column}
+    \end{columns}
+
+    % Overlay TikZ per Immagine e Testo
+    \begin{tikzpicture}[remember picture, overlay]
+        % Immagine
+        \node[anchor=south east, inner sep=0pt, xshift=0.5cm, yshift=-0.5cm] (char) at (current page.south east) {
+            \reflectbox{\includegraphics[height=0.55\paperheight, keepaspectratio]{#2}}
+        };
+        
+        % Testo: Piccolo, corsivo, tra virgolette, sopra la testa
+        \ifx&#3&%
+        \else
+            \node[
+                anchor=south,             
+                text width=4cm,           
+                align=center,             
+                font=\footnotesize\itshape, 
+                text=ReportBlack,         
+                yshift=0.1cm              
+            ] at (char.north) {           
+                ``#3''
+            };
+        \fi
+    \end{tikzpicture}
+\end{frame}
+}
+
+% --- 2. NUOVO COMANDO: SLIDE SEMPLICE (SimpleSlide) ---
+% Nessuna immagine, layout a tutta larghezza
+% #1: Titolo
+% #2: Contenuto
+\newcommand{\SimpleSlide}[2]{
+\begin{frame}{#1}
+    #2
+\end{frame}
+}
+
+% --- INIZIO DOCUMENTO ---
+\begin{document}
+
+% --- 1. FRONT PAGE ---
+{
+\usebackgroundtemplate{
+    \begin{tikzpicture}[remember picture, overlay]
+        \fill[ReportWhite] (current page.south west) rectangle (current page.north east);
+        \fill[ReportDarkBlue] (current page.north west) rectangle ([xshift=0.5cm]current page.south west);
+        \node[anchor=north east, opacity=0.03, text=black, align=right, font=\ttfamily\tiny] at (current page.north east) {
+            1010101010 0010101011 1101010100\\
+            0101010100 1110101010 0001010111\\
+            SELECT * FROM users WHERE id = 1
+        };
+    \end{tikzpicture}
+}
+\begin{frame}[plain]
+    \centering
+    \vspace{0.5cm}
+    
+    {\Huge \textbf{\textcolor{ReportDarkBlue}{GomorraSQL}}}\\[0.2cm]
+    \textcolor{ReportGold}{\rule{5cm}{1pt}} \\[0.2cm]
+    {\Large \textcolor{ReportBlack}{Neapolitan Dialect Compiler}}\\[0.1cm]
+    {\small \textcolor{gray}{\textit{Quando 'o SQL parla napoletano}}}
+    
+    \vspace{1.0cm}
+    \includegraphics[height=2.5cm]{gomorra_gun.png} 
+    \vspace{1.0cm}
+    
+    \begin{columns}
+        \column{0.5\textwidth}
+        \raggedleft
+        \textbf{\insertauthor} \\
+        \footnotesize \matricola
+        
+        \column{0.5\textwidth}
+        \raggedright
+        \footnotesize 
+        \textbf{Implementation Report} \\
+        \insertdate
+    \end{columns}
+\end{frame}
+}
+
+% --- 2. INTRODUZIONE ---
+\GomorraSlide{Introduzione: Progetto Originale}
+{gomorra_teach.png}
+{Chest' è 'o progetto nuost'.}
+{
+    \textbf{GomorraSQL}: DSL dichiarativo ispirato a SQL con dialetto napoletano.
+    
+    \vspace{0.5cm}
+    
+    \textbf{Caratteristiche principali:}
+    \begin{itemize}
+        \item \textbf{Traduttore runtime:} GomorraSQL $\to$ SQL standard
+        \item Esecuzione su database esistenti (MySQL, PostgreSQL, SQLite)
+        \item Implementato in Java con JDBC
+        \item Nessuna analisi semantica o ottimizzazione
+    \end{itemize}
+    
+    \vspace{0.5cm}
+    
+    \textbf{Ispirazione:} 
+    
+    \vspace{0.2cm}
+    \includegraphics[height=0.4cm]{github-logo.png} \hspace{0.2cm} \textcolor{ReportDarkBlue}{\texttt{github.com/aurasphere/gomorra-sql}}
+}
+
+% --- 3. ISPIRAZIONE: GOMORRA-SQL ORIGINALE ---
+\GomorraSlide{Introduzione: Il nostro progetto}
+{gomorra_face.png}
+{Chest' è 'o progetto nuost'.}
+{    
+    \textbf{Architettura:}
+    \begin{itemize}
+        \item Parsing e validazione semantica di query SELECT
+        \item Esecuzione diretta su \textbf{file CSV}, non database        
+        \item Generazione codice LLVM IR
+    \end{itemize}
+    
+    \vspace{0.4cm}
+    
+    \textbf{Esempio:}
+    \begin{center}
+        \texttt{\small ripigliammo * mmiez 'a "guaglioni.csv"} \\
+        $\downarrow$ \\
+        \texttt{\small SELECT * FROM guaglioni}
+    \end{center}
+}
+
+% --- 3.5 GENERAZIONE LLVM IR ---
+\GomorraSlide{Generazione LLVM IR}
+{gomorra_gun.png}
+{Facimm 'o core d' 'a query.}
+{
+    \textbf{Strategia di Compilazione:}
+    
+    \vspace{0.4cm}
+    
+    La generazione di codice LLVM IR si concentra \textbf{esclusivamente} sulla clausola \texttt{WHERE}.
+    
+    \vspace{0.4cm}
+    
+    \textbf{Cosa viene compilato:}
+    \begin{itemize}
+        \item Condizioni logiche (\texttt{e}, \texttt{o})
+        \item Operatori di confronto (\texttt{>}, \texttt{<}, \texttt{=}, \texttt{<>})
+        \item Controlli NULL (\texttt{è nisciun}, \texttt{nun è nisciun})
+    \end{itemize}
+    
+    \vspace{0.4cm}
+    
+    \textbf{Resto della query:} Parsing, validazione semantica, caricamento CSV in Python.
+}
+
+% --- 6. ANALISI SINTATTICA ---
+\SimpleSlide{Strumenti e Tecnologie}
+{
+    \begin{columns}[c]
+        % Colonna 1: Lark Parser
+        \begin{column}{0.25\textwidth}
+            \centering
+            {\Huge \textcolor{ReportDarkBlue}{\textbf{\{~\}}}} \\[0.5cm]
+            \textbf{\textcolor{ReportDarkBlue}{Parser}} \\[0.3cm]
+            \small Lark (Python) \\
+            Grammatica EBNF \\
+            Lexer + Parser
+        \end{column}
+        
+        % Colonna 2: llvmlite
+        \begin{column}{0.25\textwidth}
+            \centering
+            {\Huge \textcolor{ReportDarkBlue}{\textbf{$\gg$}}} \\[0.5cm]
+            \textbf{\textcolor{ReportDarkBlue}{Code Generator}} \\[0.3cm]
+            \small llvmlite \\
+            LLVM IR \\
+            Ottimizzazione
+        \end{column}
+        
+        % Colonna 3: Python
+        \begin{column}{0.25\textwidth}
+            \centering
+            {\Huge \textcolor{ReportDarkBlue}{\textbf{Py}}} \\[0.5cm]
+            \textbf{\textcolor{ReportDarkBlue}{Linguaggio}} \\[0.3cm]
+            \small Python 3.11 \\
+            Implementazione \\
+            Testing (pytest)
+        \end{column}
+        
+    \end{columns}
+}
+
+% --- 4. PIPELINE DI COMPILAZIONE ---
+\SimpleSlide{Pipeline di Compilazione}
+{
+    \textbf{Fasi di Compilazione:} dalla query in formato testuale fino alla generazione di codice LLVM IR.
+    
+    \vspace{0.3cm}
+    
+    La pipeline prevede una fase di \textbf{analisi semantica} che valida la correttezza della query prima di procedere alla generazione del codice.
+    
+    
+    \begin{center}
+    \begin{tikzpicture}[
+        node distance=1.5cm and 1.2cm,
+        every node/.style={font=\tiny},
+        box/.style={rectangle, draw=ReportDarkBlue, fill=ReportDarkBlue!10, thick, minimum width=1.6cm, minimum height=0.8cm, rounded corners},
+        decision/.style={diamond, draw=ReportGold, fill=ReportGold!20, thick, text width=1.3cm, align=center, inner sep=1pt, minimum height=1cm},
+        arrow/.style={->, >=stealth, thick, ReportDarkBlue}
+    ]
+        % Nodi principali - disposizione orizzontale
+        \node[box, align=center] (query) {Query\\(String)};
+        \node[box, right=of query, align=center] (parser) {Parser\\(Lark\\LALR)};
+        \node[box, right=of parser, align=center] (transformer) {Transformer\\(AST)};
+        \node[decision, right=of transformer] (semantic) {Semantic Analyzer};
+        \node[box, right=of semantic, align=center] (llvm) {LLVM\\CodeGen};
+        
+        % Errore
+        \node[box, below=0.8cm of semantic, fill=red!20, draw=red, minimum width=1.5cm] (error) {Error};
+        
+        % Frecce
+        \draw[arrow] (query) -- (parser);
+        \draw[arrow] (parser) -- (transformer);
+        \draw[arrow] (transformer) -- (semantic);
+        \draw[arrow] (semantic) -- node[above, font=\tiny] {OK} (llvm);
+        \draw[arrow] (semantic) -- (error);
+    \end{tikzpicture}
+    \end{center}
+}
+
+
+
+
+% --- 6. ANALISI LESSICALE ---
+\GomorraSlide{Analisi Lessicale}
+{gomorra_gun.png}
+{'O Lexer nun scherza.}
+{
+    \textbf{Token Recognition:} Keywords napoletane $\to$ Token
+    
+    \vspace{0.3cm}
+    
+    \begin{small}
+    \begin{tabular}{ll}
+        \texttt{ripigliammo} & $\to$ SELECT\_KW \\
+        \texttt{mmiez 'a} & $\to$ FROM\_KW \\
+        \texttt{arò} & $\to$ WHERE\_KW \\
+        \texttt{e} / \texttt{o} & $\to$ AND\_KW / OR\_KW \\
+        \texttt{è nisciun} & $\to$ IS\_KW NULL\_KW \\
+        \texttt{>=, <=, <>, =} & $\to$ COMP\_OP
+    \end{tabular}
+    \end{small}
+    
+}
+
+
+% --- 7. ANALISI SINTATTICA: GRAMMATICA ---
+\begin{frame}[fragile]
+\frametitle{Analisi Sintattica: Grammatica EBNF}
+\begin{columns}[T]
+\begin{column}{0.75\textwidth}
+    \textbf{Parser LALR con Lark}
+    
+    \vspace{0.2cm}
+    
+    \begin{small}
+    \begin{verbatim}
+select_stmt: SELECT_KW projection 
+             from_clause [where_clause]
+
+projection: ALL_COLS | column_list
+
+from_clause: FROM_KW table_ref join_clause*
+
+where_clause: WHERE_KW condition
+
+condition: logic_term (OR_KW logic_term)*
+logic_term: logic_factor (AND_KW logic_factor)*
+logic_factor: comparison | null_check 
+            | "(" condition ")"
+    \end{verbatim}
+    \end{small}
+\end{column}
+\begin{column}{0.25\textwidth}
+\end{column}
+\end{columns}
+\begin{tikzpicture}[remember picture, overlay]
+\node[anchor=south east, inner sep=0pt, xshift=0.5cm, yshift=-0.5cm] (char) at (current page.south east) {
+\reflectbox{\includegraphics[height=0.55\paperheight, keepaspectratio]{gomorra_teach.png}}
+};
+\node[anchor=south, text width=4cm, align=center, font=\footnotesize\itshape, text=ReportBlack, yshift=0.1cm] at (char.north) {'A grammatica è 'a legge.};
+\end{tikzpicture}
+\end{frame}
+
+
+% % --- 8. AST NODE STRUCTURE ---
+% \begin{frame}[fragile]{Struttura AST Nodes}
+%     \begin{columns}[t]
+%         \begin{column}{0.5\textwidth}
+%             \textbf{Nodo Radice:}
+%             \begin{small}
+%             \begin{verbatim}
+% @dataclass
+% class SelectQuery:
+%     columns: List[str] | "*"
+%     tables: List[str]
+%     where: Condition | None
+%             \end{verbatim}
+%             \end{small}
+            
+%             \vspace{0.3cm}
+            
+%             \textbf{Condizioni:}
+%             \begin{small}
+%             \begin{verbatim}
+% @dataclass
+% class Comparison(Condition):
+%     left: str
+%     operator: str
+%     right: str | int | float
+%             \end{verbatim}
+%             \end{small}
+%         \end{column}
+        
+%         \begin{column}{0.5\textwidth}
+%             \textbf{Operatori Logici:}
+%             \begin{small}
+%             \begin{verbatim}
+% @dataclass
+% class LogicOp(Condition):
+%     operator: 'AND' | 'OR'
+%     conditions: List[Condition]
+
+% @dataclass
+% class NullCheck(Condition):
+%     column: str
+%     is_null: bool
+%             \end{verbatim}
+%             \end{small}
+%         \end{column}
+%     \end{columns}
+% \end{frame}
+
+% --- 9. AST TREE VISUALIZATION - PARTE 1: SELECTQUERY ---
+\begin{frame}
+\frametitle{Visualizzazione AST (1/2): Struttura SelectQuery}
+    \textbf{Query:} \texttt{RIPIGLIAMMO nome MMIEZ 'A "guaglioni.csv" arò (eta $>$ 18 e zona = "Scampia") o nome = "Ciro"}
+    
+    \vspace{0.5cm}
+    
+    \begin{center}
+    \begin{tikzpicture}[
+        level distance=1.5cm,
+        level 1/.style={sibling distance=5cm},
+        every node/.style={draw, rectangle, rounded corners, font=\small}
+    ]
+        \node[fill=ReportDarkBlue!20] {\textbf{SelectQuery}}
+            child {node[fill=ReportGold!20] {columns: [nome]}}
+            child {node[fill=ReportGold!20] {tables: [guaglioni.csv]}}
+            child {node[fill=ReportGold!20] {\textbf{WHERE Condition}}};
+    \end{tikzpicture}
+    \end{center}
+    
+    \vspace{0.5cm}
+    
+    \textbf{Componenti principali:}
+    \begin{itemize}
+        \item \textbf{Projection:} Lista di colonne da selezionare
+        \item \textbf{From:} Tabelle sorgente (CSV files)
+        \item \textbf{Where:} Albero condizioni logiche
+    \end{itemize}
+\end{frame}
+
+% --- 9.5. AST TREE VISUALIZATION - PARTE 2: LOGICOP ---
+\begin{frame}
+\frametitle{Visualizzazione AST (2/2): Albero Condizioni WHERE}
+    \textbf{Condizione:} \texttt{(eta $>$ 18 e zona = "Scampia") o nome = "Ciro"}
+    
+    \vspace{0.5cm}
+    
+    \begin{center}
+    \begin{tikzpicture}[
+        level distance=1.5cm,
+        level 1/.style={sibling distance=6cm},
+        level 2/.style={sibling distance=4cm},
+        every node/.style={draw, rectangle, rounded corners, font=\small}
+    ]
+        \node[fill=ReportGold!20] {\textbf{LogicOp (OR)}}
+            child {node[fill=green!20] {\textbf{LogicOp (AND)}}
+                child {node[fill=blue!10] {Cms: eta > 18}}
+                child {node[fill=blue!10] {Cms: zona = Scampia}}
+            }
+            child {node[fill=green!20] {Comparison: nome = Ciro}};
+    \end{tikzpicture}
+    \end{center}
+    
+    
+    \textbf{Struttura gerarchica:}
+    \begin{itemize}
+        \item \textbf{OR esterno:} Valutazione short-circuit
+        \item \textbf{AND interno:} Entrambe condizioni devono essere vere
+        \item \textbf{Confronti:} Foglie dell'albero
+    \end{itemize}
+\end{frame}
+
+% --- 10. ANALISI SEMANTICA: SCOPE ---
+\begin{frame}[fragile]
+\frametitle{Analisi Semantica: Symbol Table}
+\begin{columns}[T]
+\begin{column}{0.75\textwidth}
+    \textbf{Validazione Colonne tramite CSV Header}
+    
+    \vspace{0.3cm}
+    
+    \textbf{Step 1:} Carica schema tabelle
+    \begin{small}
+    \begin{verbatim}
+guaglioni.csv header → {nome, zona, eta}
+    \end{verbatim}
+    \end{small}
+    
+    \vspace{0.2cm}
+    
+    \textbf{Step 2:} Verifica esistenza colonne
+    \begin{small}
+    \begin{itemize}
+        \item SELECT: \texttt{nome} $\in$ \{nome, zona, eta\} $\checkmark$
+        \item WHERE: \texttt{eta} $\in$ \{nome, zona, eta\} $\checkmark$
+        \item WHERE: \texttt{zona} $\in$ \{nome, zona, eta\} $\checkmark$
+    \end{itemize}
+    \end{small}
+    
+    \vspace{0.2cm}
+    
+    \textbf{Errore Semantico:}
+    \begin{small}
+    \texttt{RIPIGLIAMMO cognome MMIEZ 'A "guaglioni.csv" ...} $\to$ \textcolor{red}{SemanticError: Colonna 'cognome' non trovata}
+    \end{small}
+\end{column}
+\begin{column}{0.25\textwidth}
+\end{column}
+\end{columns}
+\begin{tikzpicture}[remember picture, overlay]
+\node[anchor=south east, inner sep=0pt, xshift=0.5cm, yshift=-0.5cm] (char) at (current page.south east) {
+\reflectbox{\includegraphics[height=0.55\paperheight, keepaspectratio]{gomorra_gun.png}}
+};
+\node[anchor=south, text width=4cm, align=center, font=\footnotesize\itshape, text=ReportBlack, yshift=0.1cm] at (char.north) {'E colonne se devono truvà.};
+\end{tikzpicture}
+\end{frame}
+
+% --- 11. ANALISI SEMANTICA: JOIN ---
+% \GomorraSlide{Analisi Semantica: JOIN Operations}
+% {gomorra_face.png}
+% {'E tabelle se devono azzeccà.}
+% {
+%     \textbf{Sintassi JOIN in GomorraSQL:}
+    
+%     \vspace{0.3cm}
+    
+%     \texttt{RIPIGLIAMMO ... MMIEZ 'A tab1.csv \textbf{pesc e pesc} tab2.csv}
+    
+%     \vspace{0.5cm}
+    
+%     \textbf{Implementazione:}
+%     \begin{itemize}
+%         \item \textbf{pesc e pesc:} INNER JOIN (prodotto cartesiano)
+%         \item Join implicita: tutte le combinazioni di righe
+%         \item Filtro opzionale con clausola \texttt{arò}
+%     \end{itemize}
+    
+%     \vspace{0.5cm}
+    
+%     \textbf{Esempio:}
+%     \begin{small}
+%     \texttt{RIPIGLIAMMO nome, ruolo MMIEZ 'A guaglioni.csv}\\
+%     \texttt{pesc e pesc ruoli.csv arò id = id\_2}
+%     \end{small}
+    
+    
+% }
+
+% --- 12. ANALISI SEMANTICA: JOIN DISAMBIGUATION ---
+% \begin{frame}[fragile]
+% \frametitle{Analisi Semantica: Disambiguazione JOIN}
+% \begin{columns}[T]
+% \begin{column}{0.75\textwidth}
+%     \textbf{Problema:} Due tabelle con colonna "nome"
+    
+    
+%     \begin{small}
+%     \begin{verbatim}
+% guaglioni.csv: nome, zona, eta
+% ruoli.csv: id, nome, ruolo
+%     \end{verbatim}
+%     \end{small}
+    
+    
+%     \textbf{Soluzione Automatica:} Suffisso \_2
+%     \begin{small}
+%     \begin{verbatim}
+% JOIN result: nome, zona, eta, id, nome_2, ruolo
+%                                      ^
+%                               suffisso aggiunto
+%     \end{verbatim}
+%     \end{small}
+    
+%     \vspace{0.3cm}
+    
+%     \textbf{Query Valida:}
+%     \begin{small}
+%     \texttt{RIPIGLIAMMO nome, nome\_2, ruolo MMIEZ 'A ... pesc e pesc ... arò nome = nome\_2}
+%     \end{small}
+% \end{column}
+% \begin{column}{0.25\textwidth}
+% \end{column}
+% \end{columns}
+% \begin{tikzpicture}[remember picture, overlay]
+% \node[anchor=south east, inner sep=0pt, xshift=0.5cm, yshift=-0.5cm] (char) at (current page.south east) {
+% \reflectbox{\includegraphics[height=0.55\paperheight, keepaspectratio]{gomorra_teach.png}}
+% };
+% \node[anchor=south, text width=4cm, align=center, font=\footnotesize\itshape, text=ReportBlack, yshift=0.1cm] at (char.north) {'E colonne duplicate se devono sistemà.};
+% \end{tikzpicture}
+% \end{frame}
+
+% --- 13. VISITOR PATTERN ---
+\GomorraSlide{Generazione LLVM: Visitor Pattern}
+{gomorra_teach.png}
+{'O Visitor cammina pe' ll'AST.}
+{
+    \textbf{Pattern Utilizzato:} Visitor Pattern per attraversare l'AST
+    
+    \vspace{0.3cm}
+    
+    \textbf{Implementazione:}
+    \begin{itemize}
+        \item \texttt{LLVMCodeGenerator} estende \texttt{ASTVisitor}
+        \item Ogni nodo AST ha un metodo \texttt{visit\_*} dedicato
+        \item Il metodo \texttt{visit()} fa dispatch automatico
+    \end{itemize}
+    
+    \vspace{0.3cm}
+    
+    \textbf{Metodi Visitor:}
+    \begin{small}
+    \begin{itemize}
+        \item \texttt{visit\_comparison()} $\to$ Genera codice per confronti
+        \item \texttt{visit\_logic\_op()} $\to$ Genera AND/OR
+        \item \texttt{visit\_null\_check()} $\to$ Genera controlli NULL
+    \end{itemize}
+    \end{small}
+    
+    \vspace{0.3cm}
+    
+    \textbf{Vantaggi:} Separazione tra struttura AST e generazione codice
+}
+
+% --- 14. LLVM: SCOPING E BLOCCHI ---
+\GomorraSlide{Generazione LLVM: Struttura IR}
+{gomorra_gun.png}
+{'A funzione è semplice.}
+{
+    \textbf{Struttura del Codice LLVM IR:}
+    
+    \vspace{0.3cm}
+    
+    Il compilatore genera una \textbf{singola funzione LLVM} per valutare la clausola WHERE.
+    
+    \vspace{0.3cm}
+    
+    \textbf{Architettura:}
+    \begin{itemize}
+        \item \textbf{Un solo blocco "entry":} Tutta la logica WHERE in un blocco
+        \item \textbf{IRBuilder:} Costruisce istruzioni sequenzialmente
+        \item \textbf{Nessun branching:} Le condizioni AND/OR usano operatori bit-a-bit
+        \item Termina con \texttt{ret i1} (ritorna true/false)
+    \end{itemize}
+    
+}
+
+% --- 15. TYPE INFERENCE: REGOLE ---
+\GomorraSlide{Type Inference: Regole di Inferenza}
+{gomorra_teach.png}
+{'E tipi se scoprono da soli.}
+{
+    \textbf{Analisi Automatica CSV $\to$ Tipo LLVM:}
+    
+    
+    Il compilatore analizza i valori del CSV per determinare il tipo di ogni colonna.
+    
+    
+    \begin{center}
+    \begin{tabular}{|l|l|l|}
+        \hline
+        \textbf{Condizione} & \textbf{Tipo Inferito} & \textbf{Esempio} \\
+        \hline
+        Valore vuoto & \texttt{NULL} & \texttt{""} \\
+        \hline
+        Contiene \texttt{.} e convertibile & \texttt{float} & \texttt{"19.99"} \\
+        \hline
+        Convertibile a intero & \texttt{int} & \texttt{"35"} \\
+        \hline
+        Altrimenti & \texttt{str} & \texttt{"Ciro"} \\
+        \hline
+    \end{tabular}
+    \end{center}
+    
+    
+    \textbf{Strategia:}
+    \begin{itemize}
+        \item Campiona prime 100 righe del CSV
+        \item \texttt{float} prevale su \texttt{int} se presente
+        \item Tipo predominante determina il tipo della colonna
+    \end{itemize}
+}
+
+% --- 16. ESEMPIO LLVM IR: OPERATORI LOGICI ---
+\begin{frame}[fragile]
+\frametitle{Esempio LLVM IR: Operatori Logici AND/OR}
+    \textbf{Query:} \texttt{arò (eta > 18 e zona = "Scampia") o nome = "Ciro"}
+    
+    
+    \textbf{LLVM IR Generato:}
+    
+    
+    \begin{small}
+    \begin{verbatim}
+define i1 @evaluate_row(i32 %".1") {entry:
+  ; Primo confronto: eta > 18
+  ; icmp_signed('>') → icmp sgt (signed greater than)
+  %".3" = icmp sgt i32 35, 18
+  
+  ; AND logico con secondo confronto (zona = "Scampia")
+  ; builder.and_() → and i1 (bitwise AND su booleani)
+  %".4" = and i1 %".3", 1
+  
+  ; OR logico con terzo confronto (nome = "Ciro")
+  ; builder.or_() → or i1 (bitwise OR su booleani)
+  %".5" = or i1 %".4", 1
+  ret i1 %".5"}
+    \end{verbatim}
+    \end{small}
+        
+\end{frame}
+
+% --- 18. ESEMPIO LLVM IR: NULL CHECK ---
+% \begin{frame}[fragile]
+% \frametitle{Esempio LLVM IR: Controllo NULL}
+%     \textbf{Query:} \texttt{RIPIGLIAMMO * MMIEZ 'A "guaglioni\_null.csv" arò zona è nisciun}
+    
+%     \vspace{0.3cm}
+    
+%     \textbf{LLVM IR Generato:}
+    
+%     \vspace{0.2cm}
+    
+%     \begin{small}
+%     \begin{verbatim}
+% define i1 @evaluate_row(i32 %".1") {
+% entry:
+%   ; Controllo NULL semplificato
+%   ; In implementazione completa:
+%   ; %ptr = load i8*, i8** %zona_ptr
+%   ; %is_null = icmp eq i8* %ptr, null
+  
+%   ; Demo: ritorna sempre false (0)
+%   ; visit_null_check() genera costante
+%   ret i1 0
+% }
+%     \end{verbatim}
+%     \end{small}
+    
+%     \vspace{0.3cm}
+    
+%     \textbf{Implementazione Completa:}
+%     \begin{itemize}
+%         \item Caricamento puntatore stringa: \texttt{load i8*}
+%         \item Confronto con NULL: \texttt{icmp eq i8* \%ptr, null}
+%         \item Tipo puntatore: \texttt{i8*} (char*)
+%     \end{itemize}
+% \end{frame}
+
+% --- 19. TESTING E CODE COVERAGE ---
+\GomorraSlide{Testing e Code Coverage}
+{gomorra_teach.png}
+{'E test nun mentono.}
+{
+    \textbf{19 test} che coprono tutti i casi d'uso principali:
+    \begin{itemize}
+        \item SELECT semplice e complesso
+        \item WHERE con operatori logici (AND/OR)
+        \item JOIN con disambiguazione
+        \item Controlli NULL
+        \item Errori semantici e sintattici
+        \item Type inference e generators
+    \end{itemize}
+    
+    \vspace{0.3cm}
+    
+    % \textbf{Code Coverage: 89.39\%}
+    
+    
+    \textbf{Risultato:} Tutti i 19 test passati $\checkmark$
+}
+
+% --- 20. CONCLUSIONI ---
+\begin{frame}[plain]
+    \centering
+    \vspace{1.5cm}
+    
+    {\Huge \textcolor{ReportDarkBlue}{\textbf{Grazie per l'attenzione}}}
+    
+    \vspace{1.5cm}
+    
+    \begin{columns}
+        \column{0.5\textwidth}
+        \centering
+        \textbf{\Large Angelo Alberico}\\[0.3cm]
+        \textcolor{gray}{Matr. NF22500104}\\[0.5cm]
+        
+        \includegraphics[height=0.4cm]{github-logo.png} \\[0.2cm]
+        \textcolor{ReportDarkBlue}{\texttt{github.com/Nakura125}}
+        
+        \column{0.5\textwidth}
+        \centering
+        \includegraphics[height=4cm]{gomorra_gun.png}
+    \end{columns}
+    
+    \vspace{0.5cm}
+    
+    \textcolor{gray}{\textit{GomorraSQL - Quando 'o SQL parla napoletano}}
+\end{frame}
+
+\end{document}
