@@ -39,20 +39,41 @@ def main():
     parser = argparse.ArgumentParser(description="GomorraSQL - Compilatore SQL Napoletano")
     parser.add_argument("input", help="Query o file .gsql da eseguire")
     parser.add_argument("--data-dir", default="data", help="Directory contenente i file CSV")
-    parser.add_argument("--optimize", action="store_true", help="Abilita ottimizzazioni LLVM IR (livello 2)")
+    parser.add_argument("--show-ir", action="store_true", help="Mostra LLVM IR generato")
+    parser.add_argument("--no-optimize", action="store_true", help="Disabilita ottimizzazioni LLVM IR")
     
     args = parser.parse_args()
     
-    compiler = GomorraCompiler(data_dir=args.data_dir, optimize=args.optimize)
+    # Ottimizzazioni abilitate di default, disabilitate solo con --no-optimize
+    compiler = GomorraCompiler(data_dir=args.data_dir, optimize=not args.no_optimize)
     
     try:
-        # Controlla se è un file o una query diretta
+        # Parse query per generare AST
         if Path(args.input).exists():
             print(f"📄 Esecuzione file: {args.input}")
-            results = compiler.run_file(args.input)
+            with open(args.input, 'r') as f:
+                code = f.read()
         else:
             print(f"🔍 Esecuzione query diretta")
-            results = compiler.compile_and_run(args.input)
+            code = args.input
+        
+        # Parse e analisi semantica
+        ast = compiler.parser.parse(code)
+        compiler.semantic_analyzer.analyze(ast)
+        
+        # Mostra LLVM IR se richiesto
+        if args.show_ir:
+            print("\n--- LLVM IR GENERATO ---")
+            compilation = compiler.codegen.get_ir(ast)
+            print(compilation.llvm_ir)
+            print("\n--- METADATI ---")
+            print(f"Ottimizzato: {compilation.optimized}")
+            print(f"Colonne: {compilation.metadata['columns']}")
+            print(f"Tipi: {compilation.metadata['column_types']}")
+            print()
+        
+        # Esegui query
+        results = compiler.codegen.generate_and_execute(ast)
         
         # Stampa risultati
         print_results(results)
