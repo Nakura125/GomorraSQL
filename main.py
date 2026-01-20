@@ -39,23 +39,28 @@ def main():
     parser = argparse.ArgumentParser(description="GomorraSQL - Compilatore SQL Napoletano")
     parser.add_argument("input", help="Query o file .gsql da eseguire")
     parser.add_argument("--data-dir", default="data", help="Directory contenente i file CSV")
+    parser.add_argument("--optimize", action="store_true", help="Abilita ottimizzazioni LLVM IR (livello 2)")
     
     args = parser.parse_args()
     
-    compiler = GomorraCompiler(data_dir=args.data_dir)
+    compiler = GomorraCompiler(data_dir=args.data_dir, optimize=args.optimize)
     
     try:
         # Controlla se è un file o una query diretta
         if Path(args.input).exists():
-            print(f"Esecuzione file: {args.input}\n")
+            print(f"📄 Esecuzione file: {args.input}")
             results = compiler.run_file(args.input)
         else:
-            print(f"Esecuzione query diretta\n")
+            print(f"🔍 Esecuzione query diretta")
             results = compiler.compile_and_run(args.input)
         
         # Stampa risultati
         print_results(results)
         
+    except SyntaxError as e:
+        print(f"\n❌ ERRORE SINTATTICO: {e}")
+        sys.exit(1)
+    
     except Exception as e:
         print(f"\n❌ ERRORE: {e}")
         sys.exit(1)

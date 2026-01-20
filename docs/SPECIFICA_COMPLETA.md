@@ -543,18 +543,20 @@ arò eta > 18 E prezzo >= 20.0
 ## Appendice A: Test Coverage
 
 ### Metriche Progetto
-- **Totale Statements**: 424
-- **Coverage**: 89.39%
-- **Test Totali**: 19 (tutti passati)
+- **Totale Statements**: 532
+- **Coverage**: 84.40%
+- **Test Totali**: 56 (tutti passati)
 
 ### Breakdown per Modulo
 | Modulo | Statements | Miss | Coverage |
 |--------|------------|------|----------|
 | `ast_nodes.py` | 23 | 0 | 100.00% |
 | `compiler.py` | 24 | 1 | 95.83% |
-| `llvm_codegen.py` | 212 | 22 | 89.62% |
-| `semantic_analyzer.py` | 56 | 5 | 91.07% |
-| `transformer.py` | 64 | 9 | 85.94% |
+| `parser.py` | 31 | 0 | 100.00% |
+| `llvm_codegen.py` | 320 | 74 | 76.88% |
+| `semantic_analyzer.py` | 56 | 3 | 94.64% |
+| `transformer.py` | 64 | 3 | 95.31% |
+| `visitor.py` | 13 | 2 | 84.62% |
 
 ---
 

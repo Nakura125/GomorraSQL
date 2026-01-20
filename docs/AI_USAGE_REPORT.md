@@ -37,7 +37,7 @@ L'AI ha assistito nella generazione della test suite in maniera guidata:
 - Test unitari per parser, semantic analyzer, LLVM codegen
 - Test per edge cases (NULL checks, JOIN, type inference)
 - Test end-to-end con file CSV reali
-- **Risultato finale**: 19 test, 82.39% coverage
+- **Risultato finale**: 56 test, 84.40% coverage
 
 
 ### 2.4 Spiegazioni di Argomenti Tecnici
@@ -47,9 +47,9 @@ L'AI ha fornito spiegazioni approfondite su temi complessi:
 ---
 
 ## 3. Efficacia e Vantaggi
-- **Code coverage**: 82.39%
+- **Code coverage**: 84.40%
 - **Best practices**: Type hints, docstrings, error handling, logging strutturato
-- **Testing**: 19 test funzionanti al primo tentativo
+- **Testing**: 56 test funzionanti
 
 
 ---

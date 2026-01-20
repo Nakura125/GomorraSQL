@@ -43,25 +43,26 @@ class GomorraParser:
             code: Stringa contenente la query GomorraSQL
             
         Returns:
-            AST (SelectQuery) se il parsing ha successo, None altrimenti
+            AST (SelectQuery) se il parsing ha successo
+            
+        Raises:
+            SyntaxError: Se il parsing fallisce
         """
-        print(f"--- ANALISI SINTATTICA IN CORSO ---")
-        
         try:
             # 1. Parsing (genera Parse Tree)
             parse_tree = self.parser.parse(code)
             
             # 2. Trasformazione (Parse Tree → AST)
-            print(f"--- TRASFORMAZIONE IN AST ---")
             ast = self.transformer.transform(parse_tree)
             
             return ast
             
         except UnexpectedInput as e:
-            # Gestione errori sintattici
-            print(f"ERRORE SINTATTICO: C'è qualcosa che non va alla riga {e.line}, colonna {e.column}.")
-            print(f"Contesto: {e.get_context(code)}")
-            return None
+            # Gestione errori sintattici con messaggio strutturato
+            raise SyntaxError(
+                f"Errore sintattico alla riga {e.line}, colonna {e.column}. "
+                f"Contesto: {e.get_context(code)}"
+            )
 
 
 def parse_file(filepath: str, grammar_file: str = None):

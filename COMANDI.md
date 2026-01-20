@@ -12,7 +12,7 @@ Guida rapida ai comandi per esecuzione, testing e debugging del compilatore Gomo
 uv run python main.py queries/01_select_simple.gsql
 
 # Query con confronto (equal)
-uv run python main.py queries/08_comparison_equal.gsql
+uv run python main.py queries/02_where_complex.gsql
 
 # Esegui tutte le query di esempio
 uv run python run_all_examples.py

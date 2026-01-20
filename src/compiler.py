@@ -12,17 +12,18 @@ from typing import List, Dict, Any
 class GomorraCompiler:
     """Compilatore completo per GomorraSQL"""
     
-    def __init__(self, grammar_file: str = None, data_dir: str = "data"):
+    def __init__(self, grammar_file: str = None, data_dir: str = "data", optimize: bool = True):
         """
         Inizializza il compilatore
         
         Args:
             grammar_file: Path alla grammatica (opzionale)
             data_dir: Directory con i file CSV
+            optimize: Se True, applica ottimizzazioni LLVM IR (default: True)
         """
         self.parser = GomorraParser(grammar_file)
         self.semantic_analyzer = SemanticAnalyzer(data_dir)
-        self.codegen = LLVMCodeGenerator(data_dir)
+        self.codegen = LLVMCodeGenerator(data_dir, optimize=optimize)
     
     def compile_and_run(self, code: str) -> List[Dict[str, Any]]:
         """
@@ -33,18 +34,16 @@ class GomorraCompiler:
             
         Returns:
             Risultati della query
+            
+        Raises:
+            SyntaxError: Errore di sintassi nel parsing
+            SemanticError: Errore semantico nell'analisi
         """
-        # 1. Parsing
+        # 1. Parsing (solleva SyntaxError se fallisce)
         ast = self.parser.parse(code)
-        if ast is None:
-            raise SyntaxError("Errore di sintassi nel parsing")
         
-        # 2. Analisi Semantica
-        try:
-            self.semantic_analyzer.analyze(ast)
-        except SemanticError as e:
-            print(f"ERRORE SEMANTICO: {e}")
-            raise
+        # 2. Analisi Semantica (solleva SemanticError se fallisce)
+        self.semantic_analyzer.analyze(ast)
         
         # 3. Esecuzione con LLVM Code Generator
         results = self.codegen.generate_and_execute(ast)

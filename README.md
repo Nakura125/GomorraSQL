@@ -28,51 +28,51 @@ uv sync
 
 ### Esecuzione Test
 ```bash
-# Tutti i test (20 totali)
+# Tutti i test (56 totali)
 uv run pytest tests/ -v
 
 # Con coverage report
 uv run pytest tests/ -v --cov=src --cov-report=term-missing
 
 # Test specifici
-uv run pytest tests/test_compiler.py -v        # 11 test compiler
+uv run pytest tests/test_compiler.py -v        # 27 test compiler
 uv run pytest tests/test_generators.py -v      # 3 test generators
+uv run pytest tests/test_llvm_ir_generation.py -v  # 20 test LLVM IR
 uv run pytest tests/test_type_inference.py -v  # 6 test type inference
 ```
 
 
 ## 📊 Test Suite
 
-### Test Compiler (`test_compiler.py` - 11 test)
-```python
-def test_select_all_no_where()         # SELECT senza WHERE
-def test_select_with_where()           # SELECT con condizione
-def test_select_with_null_check()      # NULL check (feedback #4)
-def test_join_query()                  # JOIN tra tabelle
-def test_lexer_error_invalid_char()    # Errore lessicale
-def test_parser_error_missing_token()  # Errore sintattico
-def test_semantic_error_column()       # Colonna inesistente
-def test_semantic_error_table()        # Tabella inesistente
-def test_llvm_ir_generation()          # Generazione IR
-def test_where_clause_comparison()     # Operatori comparazione
-def test_null_check_operations()       # Operatori NULL
-```
+**Totale**: 56 test, Coverage: 84.40%
+
+### Test Compiler (`test_compiler.py` - 27 test)
+Test end-to-end che coprono tutte le funzionalità del linguaggio:
+- SELECT con/senza WHERE, proiezioni specifiche
+- Operatori di comparazione (>, <, >=, <=, =, <>)
+- Operatori logici (AND, OR) con annidamento
+- NULL checks (è nisciun, nun è nisciun)
+- JOIN tra tabelle con disambiguazione
+- Errori semantici (tabella/colonna inesistente)
+- Errori sintattici, conversioni booleani
+- Type inference (int, float, string)
+
+### Test LLVM IR (`test_llvm_ir_generation.py` - 20 test)
+Validazione generazione LLVM IR parametrico:
+- Operatori comparazione (icmp signed/unsigned)
+- Operatori logici (and i1, or i1)
+- NULL checks, type inference
+- Struttura IR (parametri tipizzati, single basic block)
 
 ### Test Scalabilità (`test_generators.py` - 3 test)
-```python
-def test_generator_scalability()       # 500K righe JOIN
-def test_generator_memory_efficiency() # Uso memoria ridotto
-def test_csv_columns_reading()         # Lettura header-only
-```
+- Generatori lazy per JOIN su 500K righe
+- Uso memoria ridotto
+- Lettura header-only CSV
 
-### Test Type Inference (`test_type_inference.py` - 5 test)
-```python
-def test_type_inference_integer()      # Inferenza interi
-def test_type_inference_float()        # Inferenza float
-def test_type_inference_string()       # Inferenza stringhe
-def test_type_inference_mixed()        # Tipi misti
-def test_type_inference_null_values()  # Gestione NULL
-```
+### Test Type Inference (`test_type_inference.py` - 6 test)
+- Inferenza automatica tipi (int, float, string)
+- Gestione valori NULL, tipi misti
+- Generazione IR con tipi corretti
 
 **Esecuzione**:
 ```bash
@@ -81,6 +81,7 @@ uv run pytest tests/ -v --cov=src --cov-report=term-missing
 
 # Test specifici
 uv run pytest tests/test_compiler.py -v
+uv run pytest tests/test_llvm_ir_generation.py -v
 uv run pytest tests/test_generators.py -v
 uv run pytest tests/test_type_inference.py -v
 ```

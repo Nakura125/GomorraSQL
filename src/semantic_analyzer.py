@@ -59,8 +59,6 @@ class SemanticAnalyzer:
         Raises:
             SemanticError: se ci sono errori semantici
         """
-        print("--- ANALISI SEMANTICA IN CORSO ---")
-        
         # 1. Carica schemi delle tabelle
         all_columns: Set[str] = set()
         disambiguated_columns: Set[str] = set()  # Colonne con suffissi _2
@@ -92,7 +90,6 @@ class SemanticAnalyzer:
         if ast.where:
             self._validate_condition(ast.where, all_columns)
         
-        print("✓ Analisi semantica completata con successo")
         return True
     
     def _validate_condition(self, condition, available_columns: Set[str]):
