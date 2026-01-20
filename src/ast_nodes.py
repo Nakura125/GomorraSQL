@@ -6,9 +6,6 @@ Strutture dati che rappresentano le query parsed
 from dataclasses import dataclass
 from typing import List, Union, Optional, Tuple
 
-# ==========================================
-# Query Nodes
-# ==========================================
 
 @dataclass
 class SelectQuery:
@@ -17,9 +14,6 @@ class SelectQuery:
     tables: List[str]                # Tabelle (FROM + JOIN)
     where: Optional['Condition'] = None
 
-# ==========================================
-# Condition Nodes
-# ==========================================
 
 @dataclass
 class Condition:

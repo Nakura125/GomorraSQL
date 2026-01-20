@@ -16,10 +16,7 @@ class ToAstTransformer(Transformer):
     
     def select_stmt(self, items):
         """select_stmt: SELECT_KW projection from_clause [where_clause]"""
-        # items[0] = Token SELECT_KW (da scartare)
-        # items[1] = projection
-        # items[2] = from_clause
-        # items[3] = where_clause (opzionale)
+        
         
         projection = items[1]
         from_clause = items[2]
@@ -53,14 +50,10 @@ class ToAstTransformer(Transformer):
     
     def from_clause(self, items):
         """from_clause: FROM_KW table_ref join_clause*"""
-        # items[0] = Token FROM_KW (da scartare)
-        # items[1+] = tabelle
         return [item for item in items[1:] if item is not None]
     
     def join_clause(self, items):
         """join_clause: JOIN_KW table_ref"""
-        # items[0] = Token JOIN_KW (da scartare)
-        # items[1] = table_ref (nome tabella)
         return items[1] if len(items) > 1 else None
     
     def table_ref(self, items):
@@ -71,8 +64,6 @@ class ToAstTransformer(Transformer):
     
     def where_clause(self, items):
         """where_clause: WHERE_KW condition"""
-        # items[0] = Token WHERE_KW (da scartare)
-        # items[1] = condizione
         return items[1]
     
     def comparison(self, items):

@@ -49,11 +49,9 @@ class LLVMCodeGenerator(ASTVisitor):
         self.builder = None
         self.optimize = optimize
                 
-        # Dati caricati (per ora li carichiamo in Python e li passiamo a LLVM)
         self.data: List[Dict[str, Any]] = []
         self.columns: List[str] = []
-        # Type schema: inferisce tipi delle colonne dal CSV
-        self.column_types: Dict[str, type] = {}  # {column_name: int|float|str}
+        self.column_types: Dict[str, type] = {} 
     
     def get_ir(self, ast: SelectQuery) -> CompilationResult:
         """
@@ -65,7 +63,6 @@ class LLVMCodeGenerator(ASTVisitor):
         Returns:
             CompilationResult con IR e metadati
         """
-        # Reset del modulo per ogni query per evitare duplicazioni di nomi
         self.module = ir.Module(name="gomorrasql_query")
         self.module.triple = target.get_default_triple()
         
@@ -102,11 +99,9 @@ class LLVMCodeGenerator(ASTVisitor):
         # Genera IR (senza side-effects)
         compilation = self.get_ir(ast)
         
-        # Compila LLVM IR con JIT (se abilitato esplicitamente)
         enable_jit = os.environ.get('GOMORRASQL_ENABLE_JIT', '0') == '1'
         
         if enable_jit:
-            # Rigenera funzione per JIT (serve func object)
             func = self._generate_query_function(ast)
             self.jit_func = self._compile_llvm_to_jit(func)
         else:
@@ -213,12 +208,8 @@ class LLVMCodeGenerator(ASTVisitor):
             self._analyze_csv_types(csv_path)
             
             self.columns = self._get_csv_columns(csv_path)
-            # Materializza in list solo per compatibilità con _execute_query
-            # In una implementazione completamente lazy, anche questa sarebbe un generatore
             self.data = list(self._csv_generator(csv_path))
         else:
-            # JOIN: prodotto cartesiano lazy tra tabelle
-            # Leggi header senza caricare dati
             csv_path1 = self.data_dir / tables[0]
             csv_path2 = self.data_dir / tables[1]
             
@@ -241,8 +232,6 @@ class LLVMCodeGenerator(ASTVisitor):
                 else:
                     self.columns.append(col)
             
-            # Genera prodotto cartesiano usando generatori
-            # Il generatore ricrea il reader CSV per la seconda tabella ad ogni iterazione
             self.data = list(self._cartesian_product_generator(csv_path1, csv_path2, cols1, cols2))
     
     def _generate_query_function(self, ast: SelectQuery):
@@ -256,16 +245,13 @@ class LLVMCodeGenerator(ASTVisitor):
         # Imposta triple nativo prima di generare il codice
         self.module.triple = llvm.get_default_triple()
         
-        # Determina parametri della funzione in base alle colonne usate nel WHERE
         if ast.where is None:
-            # Nessun WHERE: funzione dummy che ritorna sempre true
             func_type = ir.FunctionType(ir.IntType(1), [])
             func = ir.Function(self.module, func_type, name="evaluate_row")
             block = func.append_basic_block(name="entry")
             self.builder = ir.IRBuilder(block)
             self.builder.ret(ir.Constant(ir.IntType(1), 1))
         else:
-            # Estrai colonne usate nel WHERE per creare parametri
             where_columns = self._extract_columns_from_condition(ast.where)
             
             # Crea parametri funzione: un parametro per ogni colonna usata
@@ -322,12 +308,8 @@ class LLVMCodeGenerator(ASTVisitor):
             llvmmod = llvm.parse_assembly(str(self.module))
             llvmmod.verify()
             
-            # L'IR generato è già ottimale per le query semplici
-            # Le ottimizzazioni vengono applicate dal JIT a runtime
             
         except (AttributeError, Exception):
-            # Fallback silenzioso per vecchie versioni di llvmlite
-            # L'ottimizzazione non è critica
             pass
     
     def _compile_llvm_to_jit(self, func):
@@ -463,7 +445,6 @@ class LLVMCodeGenerator(ASTVisitor):
             for cond in condition.conditions:
                 columns.extend(self._extract_columns_from_condition(cond))
         
-        # Rimuovi duplicati PRESERVANDO L'ORDINE (dict mantiene insertion order da Python 3.7+)
         return list(dict.fromkeys(columns))
     
     def visit_null_check(self, node: NullCheck):
@@ -479,7 +460,6 @@ class LLVMCodeGenerator(ASTVisitor):
         if node.is_null:
             return is_null
         else:
-            # NOT NULL: inverti il risultato
             return self.builder.xor(is_null, ir.Constant(ir.IntType(1), 1))
     
     def visit_logic_op(self, node: LogicOp):

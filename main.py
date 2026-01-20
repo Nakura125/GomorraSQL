@@ -66,11 +66,7 @@ def main():
             print("\n--- LLVM IR GENERATO ---")
             compilation = compiler.codegen.get_ir(ast)
             print(compilation.llvm_ir)
-            print("\n--- METADATI ---")
-            print(f"Ottimizzato: {compilation.optimized}")
-            print(f"Colonne: {compilation.metadata['columns']}")
-            print(f"Tipi: {compilation.metadata['column_types']}")
-            print()
+            
         
         # Esegui query
         results = compiler.codegen.generate_and_execute(ast)
